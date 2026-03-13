@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DataLens - Intelligent Analysis System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #08080f;
+  --surf:     #0f0f1c;
+  --surf2:    #161626;
+  --border:   #1e1e35;
+  --border2:  #2a2a48;
+  --text:     #e8e8f8;
+  --muted:    #5a5a80;
+  --accent:   #7c6af7;
+  --accent2:  #a78bfa;
+  --green:    #34d399;
+  --amber:    #fbbf24;
+  --red:      #f87171;
+  --cyan:     #22d3ee;
+  --pink:     #f472b6;
+  --font:     'Syne', sans-serif;
+  --mono:     'JetBrains Mono', monospace;
+  --r:        14px;
+  --r2:       20px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; overflow-x: hidden; }
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 60% 40% at 80% 10%, rgba(124,106,247,.08) 0%, transparent 60%),
+              radial-gradient(ellipse 50% 30% at 10% 90%, rgba(34,211,238,.05) 0%, transparent 60%);
+}
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surf); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── Header ───────────────────────────────────────────── */
+header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  background: rgba(8,8,15,.85);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(124,106,247,.4);
+}
+.logo-text h1 { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+.logo-text p { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+#file-badge {
+  margin-left: auto; font-size: 11px; font-family: var(--mono);
+  background: var(--surf2); border: 1px solid var(--border2);
+  padding: 5px 14px; border-radius: 20px; color: var(--muted);
+  display: none;
+}
+
+/* ── Layout ───────────────────────────────────────────── */
+.app { display: flex; min-height: calc(100vh - 73px); }
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surf);
+  padding: 24px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.main { flex: 1; padding: 28px 32px; overflow: auto; }
+
+/* ── Upload zone ──────────────────────────────────────── */
+#upload-zone {
+  border: 2px dashed var(--border2); border-radius: var(--r2);
+  padding: 80px 40px; text-align: center; cursor: pointer;
+  transition: all .25s; background: var(--surf);
+  position: relative; overflow: hidden;
+}
+#upload-zone::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(124,106,247,.06) 0%, transparent 70%);
+  opacity: 0; transition: opacity .3s;
+}
+#upload-zone:hover, #upload-zone.drag { border-color: var(--accent); }
+#upload-zone:hover::before, #upload-zone.drag::before { opacity: 1; }
+#upload-zone.drag { transform: scale(1.01); }
+.upload-icon { font-size: 52px; margin-bottom: 16px; display: block; animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+#upload-zone h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+#upload-zone p { color: var(--muted); font-size: 13px; margin-bottom: 24px; font-family: var(--mono); }
+.btn-upload {
+  display: inline-block; background: var(--accent);
+  color: white; padding: 11px 32px; border-radius: 10px;
+  font-weight: 700; font-size: 14px; font-family: var(--font);
+  cursor: pointer; border: none; transition: all .2s;
+  box-shadow: 0 4px 20px rgba(124,106,247,.35);
+}
+.btn-upload:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124,106,247,.5); }
+#file-input { display: none; }
+
+/* ── Nav ──────────────────────────────────────────────── */
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: var(--r);
+  cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--muted); transition: all .15s; border: none;
+  background: transparent; width: 100%; text-align: left;
+}
+.nav-item:hover { background: var(--surf2); color: var(--text); }
+.nav-item.active { background: rgba(124,106,247,.15); color: var(--accent2); }
+.nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+.nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
+.nav-section { font-size: 10px; font-family: var(--mono); color: var(--muted); padding: 8px 14px 4px; letter-spacing: .08em; }
+#reset-btn {
+  margin-top: auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: var(--r);
+  cursor: pointer; font-size: 13px; font-weight: 600;
+  color: var(--red); background: rgba(248,113,113,.08);
+  border: 1px solid rgba(248,113,113,.2); width: 100%;
+  transition: all .2s; display: none;
+}
+#reset-btn:hover { background: rgba(248,113,113,.15); }
+
+/* ── Tabs / Panels ────────────────────────────────────── */
+.panel { display: none; animation: fadeIn .3s ease; }
+.panel.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Stat cards ───────────────────────────────────────── */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card {
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px 18px;
+  transition: border-color .2s;
+}
+.stat-card:hover { border-color: var(--border2); }
+.stat-label { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: .08em; margin-bottom: 6px; }
+.stat-val { font-size: 26px; font-weight: 800; letter-spacing: -.03em; }
+.stat-sub { font-size: 10px; color: var(--muted); margin-top: 2px; font-family: var(--mono); }
+
+/* ── Section heading ──────────────────────────────────── */
+.section-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 18px;
+}
+.section-head h2 { font-size: 15px; font-weight: 700; }
+.badge {
+  font-size: 10px; font-family: var(--mono); font-weight: 600;
+  padding: 2px 9px; border-radius: 20px;
+  background: rgba(124,106,247,.18); color: var(--accent2);
+}
+
+/* ── Axis controls ────────────────────────────────────── */
+.controls { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; align-items: center; }
+.ctrl-group { display: flex; align-items: center; gap: 8px; }
+.ctrl-group label { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+select.ctrl {
+  background: var(--surf2); border: 1px solid var(--border2);
+  color: var(--text); padding: 7px 12px; border-radius: 9px;
+  font-size: 12px; font-family: var(--font); font-weight: 600;
+  cursor: pointer; outline: none; transition: border-color .2s;
+}
+select.ctrl:focus { border-color: var(--accent); }
+
+/* ── Chart grid ───────────────────────────────────────── */
+.chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-card {
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 22px;
+  transition: border-color .25s, transform .2s;
+}
+.chart-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.chart-card h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.chart-card .chart-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 16px; }
+.chart-wrap { position: relative; height: 240px; }
+
+/* ── Notes ────────────────────────────────────────────── */
+.note {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; border-radius: var(--r);
+  margin-bottom: 8px; font-size: 13px;
+  border-left: 3px solid;
+  animation: fadeIn .3s ease both;
+}
+.note.ok    { background: rgba(52,211,153,.06); border-color: var(--green); color: #a7f3d0; }
+.note.warn  { background: rgba(251,191,36,.06); border-color: var(--amber); color: #fde68a; }
+.note.info  { background: rgba(124,106,247,.08); border-color: var(--accent); color: var(--accent2); }
+.note-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Tables ───────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border-radius: var(--r); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { background: var(--surf2); }
+th { padding: 11px 14px; text-align: left; font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: .06em; font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th.num { text-align: right; }
+td { padding: 9px 14px; border-bottom: 1px solid rgba(30,30,53,.8); color: var(--text); }
+td.num { text-align: right; font-family: var(--mono); font-size: 11px; color: var(--cyan); }
+td.null-val { color: var(--red); font-family: var(--mono); font-style: italic; font-size: 11px; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(124,106,247,.04); }
+
+/* ── Pivot cards ──────────────────────────────────────── */
+.pivot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pivot-card {
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 20px;
+}
+.pivot-card h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; }
+
+/* ── Heatmap canvas ───────────────────────────────────── */
+#heatmap-container { overflow: auto; }
+.hm-table { border-collapse: separate; border-spacing: 3px; font-size: 10px; font-family: var(--mono); }
+.hm-table th { color: var(--muted); padding: 4px 8px; font-weight: 600; white-space: nowrap; }
+.hm-table td { text-align: center; padding: 8px 10px; border-radius: 6px; font-weight: 600; transition: transform .15s; cursor: default; min-width: 46px; }
+.hm-table td:hover { transform: scale(1.1); }
+
+/* ── Describe grid ────────────────────────────────────── */
+.describe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px; }
+.desc-card {
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 14px;
+}
+.desc-card h4 { font-size: 11px; font-family: var(--mono); color: var(--accent2); margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desc-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.desc-row span:first-child { color: var(--muted); font-family: var(--mono); }
+.desc-row span:last-child { font-weight: 600; }
+
+/* ── Loading ──────────────────────────────────────────── */
+#loading {
+  position: fixed; inset: 0; background: rgba(8,8,15,.9);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 16px; z-index: 999;
+}
+.spinner {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid var(--border2);
+  border-top-color: var(--accent);
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading p { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+
+/* ── Search ───────────────────────────────────────────── */
+#search-input {
+  background: var(--surf2); border: 1px solid var(--border2);
+  color: var(--text); padding: 8px 14px; border-radius: 9px;
+  font-size: 12px; font-family: var(--mono); outline: none;
+  width: 220px; transition: border-color .2s; margin-bottom: 16px;
+}
+#search-input:focus { border-color: var(--accent); }
+
+/* ── Type badge ───────────────────────────────────────── */
+.type-badge {
+  font-size: 9px; font-family: var(--mono); padding: 1px 7px;
+  border-radius: 10px; font-weight: 700; margin-left: 6px;
+}
+.type-num { background: rgba(34,211,238,.15); color: var(--cyan); }
+.type-cat { background: rgba(244,114,182,.15); color: var(--pink); }
+
+/* ── Error ────────────────────────────────────────────── */
+#error-box {
+  background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3);
+  border-radius: var(--r); padding: 14px 18px; color: var(--red);
+  font-size: 13px; margin-bottom: 16px; display: none;
+}
+
+@media (max-width: 768px) {
+  .chart-grid, .pivot-grid { grid-template-columns: 1fr; }
+  .sidebar { width: 200px; }
+  .main { padding: 20px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Analysing your data...</p>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">&#9889;</div>
+  <div class="logo-text">
+    <h1>DataLens</h1>
+    <p>Intelligent Analysis System</p>
+  </div>
+  <div id="file-badge">&#128194; <span id="file-name-badge"></span></div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <nav class="sidebar" id="sidebar">
+    <div class="nav-section">NAVIGATION</div>
+    <button class="nav-item" data-panel="upload" onclick="showPanel('upload')">
+      <span class="icon">&#8679;</span> Upload Data
+    </button>
+    <div class="nav-divider"></div>
+    <div class="nav-section">ANALYSIS</div>
+    <button class="nav-item" data-panel="dashboard" onclick="showPanel('dashboard')">
+      <span class="icon">&#9783;</span> Dashboard
+    </button>
+    <button class="nav-item" data-panel="pivot" onclick="showPanel('pivot')">
+      <span class="icon">&#9783;</span> Pivot Tables
+    </button>
+    <button class="nav-item" data-panel="quality" onclick="showPanel('quality')">
+      <span class="icon">&#10003;</span> Data Quality
+    </button>
+    <button class="nav-item" data-panel="preview" onclick="showPanel('preview')">
+      <span class="icon">&#128196;</span> Data Preview
+    </button>
+    <button id="reset-btn" onclick="resetAll()">&#8635; Upload New File</button>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <div id="error-box"></div>
+
+    <!-- ── Upload panel ───────────────────────────────── -->
+    <div id="panel-upload" class="panel active">
+      <div id="upload-zone"
+        ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)"
+        onclick="document.getElementById('file-input').click()">
+        <span class="upload-icon">&#128202;</span>
+        <h2>Drop your dataset here</h2>
+        <p>Supports CSV &bull; XLSX &bull; XLS</p>
+        <label class="btn-upload">Browse File</label>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])"/>
+      </div>
+    </div>
+
+    <!-- ── Dashboard panel ───────────────────────────── -->
+    <div id="panel-dashboard" class="panel">
+      <div id="stat-grid" class="stat-grid"></div>
+
+      <div class="section-head">
+        <h2>Charts</h2>
+        <span class="badge" id="chart-badge">Loading...</span>
+      </div>
+
+      <div class="controls">
+        <div class="ctrl-group">
+          <label>X Axis</label>
+          <select id="x-select" class="ctrl" onchange="redrawCharts()"></select>
+        </div>
+        <div class="ctrl-group">
+          <label>Y Axis</label>
+          <select id="y-select" class="ctrl" onchange="redrawCharts()"></select>
+        </div>
+      </div>
+
+      <div class="chart-grid" id="chart-grid"></div>
+    </div>
+
+    <!-- ── Pivot panel ────────────────────────────────── -->
+    <div id="panel-pivot" class="panel">
+      <div class="section-head"><h2>Pivot Tables</h2></div>
+      <div class="pivot-grid" id="pivot-grid"></div>
+    </div>
+
+    <!-- ── Quality panel ─────────────────────────────── -->
+    <div id="panel-quality" class="panel">
+      <div class="section-head"><h2>Data Quality Report</h2><span class="badge" id="quality-badge"></span></div>
+      <div id="quality-notes"></div>
+      <div class="section-head" style="margin-top:28px"><h2>Column Summary</h2></div>
+      <div class="table-wrap" id="col-summary-wrap"></div>
+      <div class="section-head" style="margin-top:28px"><h2>Numeric Statistics</h2></div>
+      <div class="describe-grid" id="describe-grid"></div>
+    </div>
+
+    <!-- ── Preview panel ─────────────────────────────── -->
+    <div id="panel-preview" class="panel">
+      <div class="section-head"><h2>Data Preview</h2><span class="badge" id="preview-badge"></span></div>
+      <input type="text" id="search-input" placeholder="Search rows..." oninput="filterPreview(this.value)"/>
+      <div class="table-wrap" id="preview-table-wrap"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let state = null;
+let charts = {};
+let allPreviewRows = [];
+let previewCols = [];
+
+const COLORS = ['#7c6af7','#22d3ee','#34d399','#f87171','#fbbf24','#f472b6','#818cf8','#6ee7b7','#fca5a5','#fde68a'];
+
+// ── Panel navigation ──────────────────────────────────────────────────────────
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  document.querySelector(`[data-panel="${id}"]`).classList.add('active');
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+function onDragLeave()  { document.getElementById('upload-zone').classList.remove('drag'); }
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+}
+
+// ── Upload & process ──────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if (!file) return;
+  showError('');
+  document.getElementById('loading').style.display = 'flex';
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+    state = data;
+    buildUI(data, file.name);
+    showPanel('dashboard');
+    document.getElementById('file-badge').style.display = 'flex';
+    document.getElementById('file-name-badge').textContent = file.name;
+    document.getElementById('reset-btn').style.display = 'flex';
+  } catch(e) {
+    showError('Could not connect to the server. Make sure app.py is running on port 5000.');
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.style.display = msg ? 'block' : 'none';
+}
+
+function resetAll() {
+  state = null;
+  Object.values(charts).forEach(c => c.destroy && c.destroy());
+  charts = {};
+  document.getElementById('file-badge').style.display = 'none';
+  document.getElementById('reset-btn').style.display = 'none';
+  showPanel('upload');
+}
+
+// ── Build all UI ──────────────────────────────────────────────────────────────
+function buildUI(data, filename) {
+  buildStats(data);
+  populateAxisSelects(data);
+  buildAllCharts(data);
+  buildPivotTables(data.pivots);
+  buildQuality(data);
+  buildPreview(data);
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function buildStats(data) {
+  const s = data.stats;
+  const grid = document.getElementById('stat-grid');
+  const cards = [
+    { label: 'ROWS', val: s.rows_clean.toLocaleString(), sub: s.rows_raw !== s.rows_clean ? `${s.rows_raw} before cleaning` : 'All rows kept' },
+    { label: 'COLUMNS', val: s.cols, sub: '' },
+    { label: 'NUMERIC', val: s.numeric_cols.length, sub: s.numeric_cols.slice(0,2).join(', ') || 'none', color: 'var(--cyan)' },
+    { label: 'CATEGORICAL', val: s.cat_cols.length, sub: s.cat_cols.slice(0,2).join(', ') || 'none', color: 'var(--pink)' },
+  ];
+  // Add numeric means
+  s.numeric_cols.slice(0,3).forEach(col => {
+    const desc = data.describe[col];
+    if (desc) cards.push({ label: col.toUpperCase().slice(0,12), val: parseFloat(desc.mean).toFixed(2), sub: `min ${parseFloat(desc.min).toFixed(1)} · max ${parseFloat(desc.max).toFixed(1)}`, color: 'var(--accent2)' });
+  });
+  grid.innerHTML = cards.map(c => `
+    <div class="stat-card">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-val" style="color:${c.color||'var(--text)'}">${c.val}</div>
+      ${c.sub ? `<div class="stat-sub">${c.sub}</div>` : ''}
+    </div>`).join('');
+}
+
+// ── Axis selects ──────────────────────────────────────────────────────────────
+function populateAxisSelects(data) {
+  const s = data.stats;
+  const xSel = document.getElementById('x-select');
+  const ySel = document.getElementById('y-select');
+  xSel.innerHTML = s.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+  ySel.innerHTML = s.columns.map(c => `<option value="${c}">${c}</option>`).join('');
+  if (s.cat_cols[0]) xSel.value = s.cat_cols[0];
+  if (s.numeric_cols[0]) ySel.value = s.numeric_cols[0];
+}
+
+// ── Destroy old charts ────────────────────────────────────────────────────────
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ── Main chart builder ────────────────────────────────────────────────────────
+function buildAllCharts(data) {
+  const xCol = document.getElementById('x-select').value;
+  const yCol = document.getElementById('y-select').value;
+  const s = data.stats;
+  const grid = document.getElementById('chart-grid');
+
+  document.getElementById('chart-badge').textContent = `${s.numeric_cols.length} numeric · ${s.cat_cols.length} categorical`;
+
+  Object.keys(charts).forEach(id => destroyChart(id));
+  grid.innerHTML = '';
+
+  const cards = [];
+
+  // 1. Bar chart
+  if (data.charts.bar) cards.push({ id: 'bar', title: 'Bar Chart', sub: `${data.charts.bar.x} vs ${data.charts.bar.y}`, fn: buildBar });
+  // 2. Line chart
+  if (data.charts.line) cards.push({ id: 'line', title: 'Line Chart', sub: `${data.charts.line.y} trend`, fn: buildLine });
+  // 3. Pie chart
+  if (data.charts.pie) cards.push({ id: 'pie', title: 'Pie Chart', sub: `${data.charts.pie.col} distribution`, fn: buildPie });
+  // 4. Histogram
+  if (data.charts.histogram) cards.push({ id: 'histogram', title: 'Histogram', sub: `${data.charts.histogram.col} frequency`, fn: buildHistogram });
+  // 5. Scatter
+  if (data.charts.scatter) cards.push({ id: 'scatter', title: 'Scatter Plot', sub: `${data.charts.scatter.x} vs ${data.charts.scatter.y}`, fn: buildScatter });
+  // 6. Heatmap
+  if (data.charts.heatmap) cards.push({ id: 'heatmap', title: 'Correlation Heatmap', sub: 'Numeric columns', fn: buildHeatmap });
+
+  cards.forEach(({ id, title, sub, fn }) => {
+    const div = document.createElement('div');
+    div.className = 'chart-card';
+    const isHeatmap = id === 'heatmap';
+    div.innerHTML = `
+      <h3>${title}</h3>
+      <div class="chart-sub">${sub}</div>
+      ${isHeatmap
+        ? `<div id="heatmap-container"></div>`
+        : `<div class="chart-wrap"><canvas id="chart-${id}"></canvas></div>`}
+    `;
+    grid.appendChild(div);
+    setTimeout(() => fn(data.charts[id], id), 50);
+  });
+}
+
+function redrawCharts() { if (state) buildAllCharts(state); }
+
+// Chart.js defaults
+const chartDefaults = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#5a5a80', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(30,30,53,.8)' } },
+    y: { ticks: { color: '#5a5a80', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(30,30,53,.8)' } },
+  }
+};
+
+function buildBar(d) {
+  const ctx = document.getElementById('chart-bar');
+  if (!ctx) return;
+  destroyChart('bar');
+  charts['bar'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [{ label: d.y, data: d.values, backgroundColor: COLORS.map(c => c + 'cc'), borderRadius: 6, borderSkipped: false }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+  });
+}
+
+function buildLine(d) {
+  const ctx = document.getElementById('chart-line');
+  if (!ctx) return;
+  destroyChart('line');
+  charts['line'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [{ label: d.y, data: d.values, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,.08)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+  });
+}
+
+function buildPie(d) {
+  const ctx = document.getElementById('chart-pie');
+  if (!ctx) return;
+  destroyChart('pie');
+  charts['pie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: d.labels,
+      datasets: [{ data: d.values, backgroundColor: COLORS, borderWidth: 2, borderColor: '#0f0f1c' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: { legend: { position: 'right', labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 }, boxWidth: 12 } } }
+    }
+  });
+}
+
+function buildHistogram(d) {
+  const ctx = document.getElementById('chart-histogram');
+  if (!ctx) return;
+  destroyChart('histogram');
+  charts['histogram'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.labels,
+      datasets: [{ label: 'Count', data: d.values, backgroundColor: '#818cf8cc', borderRadius: 4, borderSkipped: false, barPercentage: 0.95, categoryPercentage: 1 }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+  });
+}
+
+function buildScatter(d) {
+  const ctx = document.getElementById('chart-scatter');
+  if (!ctx) return;
+  destroyChart('scatter');
+  charts['scatter'] = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [{ label: `${d.x} vs ${d.y}`, data: d.points, backgroundColor: '#f472b680', pointRadius: 4 }]
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: { ...chartDefaults.scales.x, title: { display: true, text: d.x, color: '#5a5a80', font: { family: 'JetBrains Mono', size: 10 } } },
+        y: { ...chartDefaults.scales.y, title: { display: true, text: d.y, color: '#5a5a80', font: { family: 'JetBrains Mono', size: 10 } } }
+      }
+    }
+  });
+}
+
+function buildHeatmap(d) {
+  const container = document.getElementById('heatmap-container');
+  if (!container) return;
+  const cols = d.cols;
+  const matrix = d.matrix;
+  // Find min/max for color scaling (excluding diagonal)
+  let maxAbs = 0;
+  matrix.forEach((row, i) => row.forEach((v, j) => { if (i !== j && v != null) maxAbs = Math.max(maxAbs, Math.abs(v)); }));
+
+  let html = '<table class="hm-table"><thead><tr><th></th>';
+  cols.forEach(c => html += `<th>${c.slice(0,8)}</th>`);
+  html += '</tr></thead><tbody>';
+  matrix.forEach((row, i) => {
+    html += `<tr><th>${cols[i].slice(0,8)}</th>`;
+    row.forEach((v, j) => {
+      let bg, color;
+      if (v == null) { bg = 'var(--surf2)'; color = 'var(--muted)'; }
+      else if (i === j) { bg = 'rgba(124,106,247,.25)'; color = 'var(--accent2)'; }
+      else {
+        const alpha = Math.abs(v) / (maxAbs || 1);
+        bg = v > 0 ? `rgba(52,211,153,${alpha * .6})` : `rgba(248,113,113,${alpha * .6})`;
+        color = 'var(--text)';
+      }
+      html += `<td style="background:${bg};color:${color}" title="${cols[i]} vs ${cols[j]}: ${v}">${v != null ? v.toFixed(2) : '-'}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ── Pivot tables ──────────────────────────────────────────────────────────────
+function buildPivotTables(pivots) {
+  const grid = document.getElementById('pivot-grid');
+  if (!pivots.length) { grid.innerHTML = '<p style="color:var(--muted);font-size:13px">Need at least one categorical and one numeric column.</p>'; return; }
+  grid.innerHTML = pivots.map(pv => {
+    const cols = Object.keys(pv.rows[0] || {});
+    const rows = pv.rows.map(row => `<tr>${cols.map(c => {
+      const isNum = typeof row[c] === 'number';
+      return `<td class="${isNum ? 'num' : ''}">${row[c] ?? '<span class="null-val">null</span>'}</td>`;
+    }).join('')}</tr>`).join('');
+    return `
+    <div class="pivot-card">
+      <h3>${pv.title}</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>${cols.map(c => `<th class="${c !== pv.cat ? 'num' : ''}">${c}</th>`).join('')}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Quality ───────────────────────────────────────────────────────────────────
+function buildQuality(data) {
+  const notes = data.notes;
+  document.getElementById('quality-badge').textContent = `${notes.length} note${notes.length !== 1 ? 's' : ''}`;
+
+  document.getElementById('quality-notes').innerHTML = notes.map(n => `
+    <div class="note ${n.level}">
+      <span class="note-icon">${{ok:'&#10003;',warn:'&#9888;',info:'&#8505;'}[n.level]||'&#8505;'}</span>
+      <span>${n.text}</span>
+    </div>`).join('');
+
+  // Column summary
+  const cols = data.col_summary;
+  const tableHTML = `
+    <table>
+      <thead><tr><th>Column</th><th>Type</th><th class="num">Missing</th><th class="num">Unique</th><th>Sample</th></tr></thead>
+      <tbody>${cols.map(c => `
+        <tr>
+          <td><strong>${c.name}</strong></td>
+          <td><span class="type-badge ${c.type === 'numeric' ? 'type-num' : 'type-cat'}">${c.type}</span></td>
+          <td class="num" style="color:${c.missing > 0 ? 'var(--amber)' : 'var(--green)'}">${c.missing}</td>
+          <td class="num">${c.unique}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${c.sample}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  document.getElementById('col-summary-wrap').innerHTML = tableHTML;
+
+  // Describe
+  const describe = data.describe;
+  const statKeys = ['count','mean','std','min','25%','50%','75%','max'];
+  document.getElementById('describe-grid').innerHTML = Object.entries(describe).map(([col, stats]) => `
+    <div class="desc-card">
+      <h4>${col}</h4>
+      ${statKeys.filter(k => stats[k] != null).map(k => `
+        <div class="desc-row">
+          <span>${k}</span>
+          <span>${parseFloat(stats[k]).toFixed(3)}</span>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+function buildPreview(data) {
+  allPreviewRows = data.preview;
+  previewCols = data.stats.columns;
+  document.getElementById('preview-badge').textContent = `${data.stats.rows_clean.toLocaleString()} total rows · showing 50`;
+  renderPreviewTable(allPreviewRows);
+}
+
+function renderPreviewTable(rows) {
+  const numericCols = state ? state.stats.numeric_cols : [];
+  const head = `<thead><tr>${previewCols.map(c => `
+    <th>${c}<span class="type-badge ${numericCols.includes(c) ? 'type-num' : 'type-cat'}">${numericCols.includes(c) ? '#' : 'Aa'}</span></th>`).join('')}</tr></thead>`;
+  const body = `<tbody>${rows.map(row => `<tr>${previewCols.map(c =>
+    row[c] == null
+      ? `<td class="null-val">null</td>`
+      : `<td>${String(row[c]).slice(0, 60)}</td>`
+  ).join('')}</tr>`).join('')}</tbody>`;
+  document.getElementById('preview-table-wrap').innerHTML = `<table>${head}${body}</table>`;
+}
+
+function filterPreview(q) {
+  if (!q) { renderPreviewTable(allPreviewRows); return; }
+  const lower = q.toLowerCase();
+  const filtered = allPreviewRows.filter(row =>
+    Object.values(row).some(v => v != null && String(v).toLowerCase().includes(lower))
+  );
+  renderPreviewTable(filtered);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+showPanel('upload');
+</script>
+</body>
+</html>
